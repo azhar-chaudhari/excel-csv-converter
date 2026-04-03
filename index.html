@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Universal Data Converter</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --bg:#0a0a0f; --surface:#12121a; --card:#1a1a26; --border:#2a2a3e;
+  --accent:#6c63ff; --text:#e8e8f0; --muted:#6b6b8a; --radius:16px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:
+  radial-gradient(ellipse 60% 40% at 20% 20%,rgba(108,99,255,.12) 0%,transparent 70%),
+  radial-gradient(ellipse 50% 60% at 80% 80%,rgba(255,101,132,.08) 0%,transparent 70%),
+  radial-gradient(ellipse 40% 40% at 60% 40%,rgba(67,233,123,.06) 0%,transparent 70%);
+  pointer-events:none;z-index:0}
+.container{position:relative;z-index:1;max-width:960px;margin:0 auto;padding:36px 18px 80px}
+
+/* Header */
+header{text-align:center;margin-bottom:40px}
+.logo-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(108,99,255,.12);border:1px solid rgba(108,99,255,.3);border-radius:999px;padding:5px 15px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#9d97ff;margin-bottom:16px}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent);animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+h1{font-size:clamp(1.7rem,4vw,2.8rem);font-weight:800;line-height:1.1;letter-spacing:-.02em;background:linear-gradient(135deg,#fff 0%,#9d97ff 50%,#ff6584 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:8px}
+.subtitle{color:var(--muted);font-size:13px;font-family:'JetBrains Mono',monospace}
+
+/* Tab Switcher */
+.tsw{overflow-x:auto;padding-bottom:4px;display:flex;justify-content:center;margin-bottom:32px;scrollbar-width:none}
+.tsw::-webkit-scrollbar{display:none}
+.tab-switcher{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:4px;gap:3px;flex-shrink:0}
+.tab-btn{background:transparent;border:none;color:var(--muted);padding:8px 16px;border-radius:999px;font-family:'Syne',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .25s ease;white-space:nowrap}
+.tab-btn.active{background:linear-gradient(135deg,var(--accent),#8b85ff);color:#fff;box-shadow:0 4px 20px rgba(108,99,255,.4)}
+.tab-btn:not(.active):hover{color:var(--text);background:var(--border)}
+
+/* Card */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:26px;margin-bottom:18px;animation:slideUp .35s ease forwards}
+@keyframes slideUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+.card-title{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:16px;display:flex;align-items:center;gap:7px}
+.bar{width:4px;height:13px;border-radius:2px;background:var(--accent);display:inline-block;flex-shrink:0}
+
+/* Drop Zone */
+.drop-zone{border:2px dashed var(--border);border-radius:12px;padding:36px 18px;text-align:center;cursor:pointer;transition:all .3s ease;position:relative;overflow:hidden}
+.drop-zone::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(108,99,255,.05),rgba(255,101,132,.05));opacity:0;transition:opacity .3s ease}
+.drop-zone:hover,.drop-zone.dragging{border-color:var(--accent);background:rgba(108,99,255,.05)}
+.drop-zone:hover::before,.drop-zone.dragging::before{opacity:1}
+.drop-icon{font-size:36px;margin-bottom:10px;display:block;transition:transform .3s ease}
+.drop-zone:hover .drop-icon{transform:translateY(-4px)}
+.drop-title{font-size:15px;font-weight:700;margin-bottom:5px}
+.drop-sub{font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-bottom:14px}
+.btn-browse{background:rgba(108,99,255,.15);border:1px solid rgba(108,99,255,.4);color:#9d97ff;padding:8px 20px;border-radius:8px;font-family:'Syne',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s ease;position:relative;z-index:1}
+.btn-browse:hover{background:rgba(108,99,255,.25);border-color:var(--accent);color:#fff}
+input[type=file]{display:none}
+
+/* File Info */
+.file-info{display:none;align-items:center;gap:10px;background:rgba(67,233,123,.08);border:1px solid rgba(67,233,123,.2);border-radius:10px;padding:11px 14px;margin-top:12px}
+.file-info.show{display:flex}
+.file-icon{font-size:20px}
+.file-details{flex:1;min-width:0}
+.file-name{font-weight:600;font-size:12px;color:#43e97b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.file-size{font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace}
+.clear-btn{background:rgba(255,101,132,.1);border:1px solid rgba(255,101,132,.3);color:#ff6584;width:24px;height:24px;border-radius:5px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;transition:all .2s ease;flex-shrink:0}
+.clear-btn:hover{background:rgba(255,101,132,.2)}
+
+/* Options */
+.options-row{display:flex;flex-wrap:wrap;gap:12px;margin-top:16px}
+.option-group{display:flex;flex-direction:column;gap:5px;flex:1;min-width:130px}
+.option-label{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.option-select,.option-input{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:7px;font-family:'JetBrains Mono',monospace;font-size:11px;transition:border-color .2s;appearance:none;-webkit-appearance:none}
+.option-select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236b6b8a' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 9px center;padding-right:26px;cursor:pointer}
+.option-select:focus,.option-input:focus{outline:none;border-color:var(--accent)}
+
+/* Sheet tabs */
+.sheet-selector{display:none;margin-top:12px}
+.sheet-selector.show{display:block}
+.sheet-tabs{display:flex;flex-wrap:wrap;gap:6px}
+.sheet-tab{background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:4px 11px;border-radius:5px;font-size:10px;font-family:'JetBrains Mono',monospace;cursor:pointer;transition:all .2s ease}
+.sheet-tab.active,.sheet-tab:hover{border-color:var(--accent);color:#9d97ff;background:rgba(108,99,255,.1)}
+
+/* Preview */
+.preview-wrap{display:none;margin-top:16px}
+.preview-wrap.show{display:block}
+.preview-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px}
+.preview-label{font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace}
+.preview-badge{background:rgba(108,99,255,.15);border:1px solid rgba(108,99,255,.3);color:#9d97ff;padding:2px 8px;border-radius:999px;font-size:10px;font-family:'JetBrains Mono',monospace}
+.table-scroll{overflow-x:auto;border-radius:9px;border:1px solid var(--border);max-height:220px;overflow-y:auto}
+table{width:100%;border-collapse:collapse;font-size:11px;font-family:'JetBrains Mono',monospace}
+thead th{background:rgba(108,99,255,.12);color:#9d97ff;padding:8px 11px;text-align:left;font-weight:500;position:sticky;top:0;white-space:nowrap;border-bottom:1px solid var(--border)}
+tbody tr:nth-child(even){background:rgba(255,255,255,.02)}
+tbody tr:hover{background:rgba(108,99,255,.06)}
+td{padding:6px 11px;color:var(--text);border-bottom:1px solid rgba(255,255,255,.04);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Code textarea */
+.code-area{width:100%;min-height:170px;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:12px;border-radius:9px;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.6;resize:vertical;transition:border-color .2s}
+.code-area:focus{outline:none;border-color:var(--accent)}
+.code-area-wrap{position:relative}
+.copy-btn{position:absolute;top:8px;right:8px;background:rgba(108,99,255,.15);border:1px solid rgba(108,99,255,.3);color:#9d97ff;padding:4px 11px;border-radius:5px;font-size:10px;font-family:'Syne',sans-serif;font-weight:600;cursor:pointer;transition:all .2s}
+.copy-btn:hover{background:rgba(108,99,255,.3);color:#fff}
+
+/* Convert btn */
+.btn-convert{width:100%;padding:14px;border:none;border-radius:11px;background:linear-gradient(135deg,var(--accent),#8b85ff);color:#fff;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer;margin-top:18px;transition:all .3s ease;display:flex;align-items:center;justify-content:center;gap:9px;position:relative;overflow:hidden;letter-spacing:.02em}
+.btn-convert::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.15),transparent);transition:left .5s ease}
+.btn-convert:hover::before{left:100%}
+.btn-convert:hover{box-shadow:0 8px 28px rgba(108,99,255,.5);transform:translateY(-2px)}
+.btn-convert:disabled{background:var(--border);color:var(--muted);cursor:not-allowed;transform:none;box-shadow:none}
+
+/* Status */
+.status-msg{display:none;margin-top:12px;padding:11px 14px;border-radius:9px;font-size:11px;font-family:'JetBrains Mono',monospace;align-items:center;gap:8px}
+.status-msg.show{display:flex}
+.status-msg.success{background:rgba(67,233,123,.1);border:1px solid rgba(67,233,123,.25);color:#43e97b}
+.status-msg.error{background:rgba(255,101,132,.1);border:1px solid rgba(255,101,132,.25);color:#ff6584}
+.status-msg.info{background:rgba(108,99,255,.1);border:1px solid rgba(108,99,255,.25);color:#9d97ff}
+
+/* Info strip */
+.info-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:9px;margin-top:24px}
+.info-item{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:11px 13px;display:flex;align-items:center;gap:9px}
+.info-emoji{font-size:16px}
+.info-text{font-size:10px;line-height:1.5;color:var(--muted)}
+.info-text strong{color:var(--text);display:block;font-size:11px}
+
+/* Tab panels */
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+/* Spinner */
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner{width:15px;height:15px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:none}
+.loading .spinner{display:block}
+.loading .btn-text{display:none}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--surface)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--muted)}
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <div class="logo-badge"><span class="dot"></span> Unicode · 6 Modes · Client-side</div>
+  <h1>Universal Data Converter</h1>
+  <p class="subtitle">// Excel · CSV · JSON · HTML Table — instant, private, no server</p>
+</header>
+
+<div class="tsw">
+  <div class="tab-switcher">
+    <button class="tab-btn active" data-tab="t1">📊 Excel→CSV</button>
+    <button class="tab-btn" data-tab="t2">📋 CSV→Excel</button>
+    <button class="tab-btn" data-tab="t3">🔷 JSON→CSV</button>
+    <button class="tab-btn" data-tab="t4">🔶 CSV→JSON</button>
+    <button class="tab-btn" data-tab="t5">📗 Excel→JSON</button>
+    <button class="tab-btn" data-tab="t6">🌐 HTML→Excel</button>
+  </div>
+</div>
+
+<!-- ═══════════ TAB 1 · Excel → CSV ═══════════ -->
+<div class="tab-panel active" id="t1">
+  <div class="card">
+    <div class="card-title"><span class="bar"></span>Upload Excel File</div>
+    <div class="drop-zone" id="dz1">
+      <span class="drop-icon">📂</span>
+      <div class="drop-title">Drop your Excel file here</div>
+      <div class="drop-sub">.xlsx · .xls · .xlsm · .ods</div>
+      <button class="btn-browse" onclick="$('#f1').click()">Browse File</button>
+      <input type="file" id="f1" accept=".xlsx,.xls,.xlsm,.ods">
+    </div>
+    <div class="file-info" id="fi1"><span class="file-icon">📊</span><div class="file-details"><div class="file-name" id="fn1"></div><div class="file-size" id="fs1"></div></div><button class="clear-btn" id="cl1">✕</button></div>
+    <div class="sheet-selector" id="ss1"><div class="card-title" style="margin:12px 0 8px"><span class="bar"></span>Select Sheet</div><div class="sheet-tabs" id="st1"></div></div>
+    <div class="preview-wrap" id="pw1"><div class="preview-header"><span class="preview-label">Preview (first 5 rows)</span><span class="preview-badge" id="pb1">—</span></div><div class="table-scroll" id="pt1"></div></div>
+  </div>
+  <div class="card">
+    <div class="card-title"><span class="bar"></span>Export Options</div>
+    <div class="options-row">
+      <div class="option-group"><label class="option-label">Delimiter</label>
+        <select class="option-select" id="o1d"><option value=",">Comma ( , )</option><option value=";">Semicolon ( ; )</option><option value="&#9;">Tab ( \t )</option><option value="|">Pipe ( | )</option></select></div>
+      <div class="option-group"><label class="option-label">Encoding</label>
+        <select class="option-select" id="o1e"><option value="bom">UTF-8 with BOM ✓</option><option value="utf8">UTF-8 (no BOM)</option></select></div>
+      <div class="option-group"><label class="option-label">Output Name</label><input class="option-input" id="o1n" value="output.csv"></div>
+    </div>
+    <button class="btn-convert" id="btn1" disabled><div class="spinner"></div><span class="btn-text">⬇ Convert &amp; Download CSV</span></button>
+    <div class="status-msg" id="st_1"></div>
+  </div>
+</div>
+
+<!-- ═══════════ TAB 2 · CSV → Excel ═══════════ -->
+<div class="tab-panel" id="t2">
+  <div class="card">
+    <div class="card-title"><span class="bar"></span>Upload CSV File</div>
+    <div class="drop-zone" id="dz2">
+      <span class="drop-icon">📋</span>
+      <div class="drop-title">Drop your CSV file here</div>
+      <div class="drop-sub">.csv · .tsv · .txt</div>
+      <button class="btn-browse" onclick="$('#f2').click()">Browse File</button>
+      <input type="file" id="f2" accept=".csv,.tsv,.txt">
+    </div>
+    <div class="file-info" id="fi2"><span class="file-icon">📋</span><div class="file-details"><div class="file-name" id="fn2"></div><div class="file-size" id="fs2"></div></div><button class="clear-btn" id="cl2">✕</button></div>
+    <div class="preview-wrap" id="pw2"><div class="preview-header"><span class="preview-label">Preview (first 5 rows)</span><span class="preview-badge" id="pb2">—</span></div><div class="table-scroll" id="pt2"></div></div>
+  </div>
+  <div class="card">
+    <div class="card-title"><span class="bar"></span>Export Options</div>
+    <div class="options-row">
+      <div class="option-group"><label class="option-label">CSV Delimiter</label>
+        <select class="option-select" id="o2d"><option value=",">Comma ( , )</option><option value=";">Semicolon ( ; )</option><option value="&#9;">Tab ( \t )</option><option value="|">Pipe ( | )</option></select></div>
+      <div class="option-group"><label class="option-label">Sheet Name</label><input class="option-input" id="o2s" value="Sheet1"></div>
+      <div class="option-group"><label class="option-label">Output Name</label><input class="option-input" id="o2n" value="output.xlsx"></div>
+    </div>
+    <button class="btn-convert" id="btn2" disabled><div class="spinner"></div><span class="btn-text">⬇ Convert &amp; Download Excel</span></button>
+    <div class="status-msg" id="st_2"></div>
+  </div>
+</div>
+
+<!-- ═══════════ TAB 3 · JSON → CSV ═══════════ -->
+<div class="tab-panel" id="t3">
+  <div class="card">
+    <div class="card-title"><span class="bar"></span>JSON Input</div>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:10px;font-family:'JetBrains Mono',monospace">Paste a JSON array of objects <span style="color:#9d97ff">[{...},{...}]</span> or upload a .json file</p>
+    <div class="drop-zone" id="dz3" style="padding:20px">
+      <span class="drop-icon" style="font-size:28px;margin-bottom:6px">🔷</span>
+      <div class="drop-sub" style="margin-bottom:10px">.json file</div>
+      <button class="btn-browse" onclick="$('#f3').click()">Upload JSON</button>
+      <input type="file" id="f3" accept=".json">
+    </div>
+    <div class="file-info" id="fi3" style="margin-top:10px"><span class="file-icon">🔷</span><div class="file-details"><div class="file-name" id="fn3"></div><div class="file-size" id="fs3"></div></div><button class="clear-btn" id="cl3">✕</button></div>
+    <textarea class="code-area" id="j3in" placeholder='[&#10;  {"name":"Alice","age":30,"city":"Mumbai"},&#10;  {"name":"Bob","age":25,"city":"Delhi"}&#10;]' style="margin-top:12px"></textarea>
+    <div class="preview-wrap" id="pw3" style="margin-top:12px"><div class="preview-header"><span class="preview-label">Preview</span><span class="preview-badge" id="pb3">—</span></div><div class="table-scroll" id="pt3"></div></div>
+  </div>
+  <div class="card">
+    <div class="card-title"><span class="bar"></span>Export Options</div>
+    <div class="options-row">
+      <div class="option-group"><label class="option-label">Delimiter</label>
+        <select class="option-select" id="o3d"><option value=",">Comma ( , )</option><option value=";">Semicolon ( ; )</option><option value="&#9;">Tab ( \t )</option><option value="|">Pipe ( | )</option></select></div>
+      <div class="option-group"><label class="option-label">Encoding</label>
+        <select class="option-select" id="o3e"><option value="bom">UTF-8 with BOM ✓</option><option value="utf8">UTF-8 (no BOM)</option></select></div>
+      <div class="option-group"><label class="option-label">Output Name</label><input class="option-input" id="o3n" value="output.csv"></div>
+    </div>
+    <button class="btn-convert" id="btn3"><div class="spinner"></div><span class="btn-text">⬇ Convert &amp; Download CSV</span></button>
+    <div class="status-msg" id="st_3"></div>
+  </div>
+</div>
+
+<!-- ═══════════ TAB 4 · CSV → JSON ═══════════ -->
+<div class="tab-panel" id="t4">
+  <div class="card">
+    <div class="card-title"><span class="bar"></span>Upload CSV File</div>
+    <div class="drop-zone" id="dz4">
+      <span class="drop-icon">📋</span>
+      <div class="drop-title">Drop your CSV file here</div>
+      <div class="drop-sub">.csv · .tsv · .txt</div>
+      <button class="btn-browse" onclick="$('#f4').click()">Browse File</button>
+      <input type="file" id="f4" accept=".csv,.tsv,.txt">
+    </div>
+    <div class="file-info" id="fi4"><span class="file-icon">📋</span><div class="file-details"><div class="file-name" id="fn4"></div><div class="file-size" id="fs4"></div></div><button class="clear-btn" id="cl4">✕</button></div>
+  </div>
+  <div class="card">
+    <div class="card-title"><span class="bar"></span>Options &amp; Output</div>
+    <div class="options-row" style="margin-top:0;margin-bottom:16px">
+      <div class="option-group"><label class="option-label">CSV Delimiter</label>
+        <select class="option-select" id="o4d"><option value=",">Comma ( , )</option><option value=";">Semicolon ( ; )</option><option value="&#9;">Tab ( \t )</option><option value="|">Pipe ( | )</option></select></div>
+      <div class="option-group"><label class="option-label">Format</label>
+        <select class="option-select" id="o4f"><option value="compact">Compact</option><option value="pretty">Pretty-printed</option></select></div>
+      <div class="option-group"><label class="option-label">Output Name</label><input class="option-input" id="o4n" value="output.json"></div>
+    </div>
+    <div class="card-title" style="margin-bottom:8px"><span class="bar"></span>JSON Output</div>
+    <div class="code-area-wrap">
+      <textarea class="code-area" id="j4out" readonly placeholder="JSON output will appear here…"></textarea>
+      <button class="copy-btn" id="cp4">Copy</button>
+    </div>
+    <button class="btn-convert" id="btn4" disabled><div class="spinner"></div><span class="btn-text">⬇ Download JSON</span></button>
+    <div class="status-msg" id="st_4"></div>
+  </div>
+</div>
+
+<!-- ═══════════ TAB 5 · Excel → JSON ═══════════ -->
+<div class="tab-panel" id="t5">
+  <div class="card">
+    <div class="card-title"><span class="bar"></span>Upload Excel File</div>
+    <div class="drop-zone" id="dz5">
+      <span class="drop-icon">📗</span>
+      <div class="drop-title">Drop your Excel file here</div>
+      <div class="drop-sub">.xlsx · .xls · .xlsm · .ods</div>
+      <button class="btn-browse" onclick="$('#f5').click()">Browse File</button>
+      <input type="file" id="f5" accept=".xlsx,.xls,.xlsm,.ods">
+    </div>
+    <div class="file-info" id="fi5"><span class="file-icon">📗</span><div class="file-details"><div class="file-name" id="fn5"></div><div class="file-size" id="fs5"></div></div><button class="clear-btn" id="cl5">✕</button></div>
+    <div class="sheet-selector" id="ss5"><div class="card-title" style="margin:12px 0 8px"><span class="bar"></span>Select Sheet</div><div class="sheet-tabs" id="st5"></div></div>
+  </div>
+  <div class="card">
+    <div class="card-title"><span class="bar"></span>Options &amp; Output</div>
+    <div class="options-row" style="margin-top:0;margin-bottom:16px">
+      <div class="option-group"><label class="option-label">Format</label>
+        <select class="option-select" id="o5f"><option value="objects">Array of objects</option><option value="arrays">Array of arrays</option><option value="pretty">Pretty objects</option></select></div>
+      <div class="option-group"><label class="option-label">Output Name</label><input class="option-input" id="o5n" value="output.json"></div>
+    </div>
+    <div class="card-title" style="margin-bottom:8px"><span class="bar"></span>JSON Output</div>
+    <div class="code-area-wrap">
+      <textarea class="code-area" id="j5out" readonly placeholder="JSON output will appear here…"></textarea>
+      <button class="copy-btn" id="cp5">Copy</button>
+    </div>
+    <button class="btn-convert" id="btn5" disabled><div class="spinner"></div><span class="btn-text">⬇ Download JSON</span></button>
+    <div class="status-msg" id="st_5"></div>
+  </div>
+</div>
+
+<!-- ═══════════ TAB 6 · HTML Table → Excel ═══════════ -->
+<div class="tab-panel" id="t6">
+  <div class="card">
+    <div class="card-title"><span class="bar"></span>HTML Table Source</div>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:10px;font-family:'JetBrains Mono',monospace">Paste HTML with <span style="color:#9d97ff">&lt;table&gt;</span> tags, or fetch from a URL</p>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <input class="option-input" id="h6url" placeholder="https://example.com/page-with-tables" style="flex:1;font-size:11px">
+      <button class="btn-browse" id="h6fetch" style="border-radius:7px;padding:7px 14px;white-space:nowrap">Fetch URL</button>
+    </div>
+    <textarea class="code-area" id="h6in" style="min-height:130px" placeholder="&lt;table&gt;&#10;  &lt;tr&gt;&lt;th&gt;Name&lt;/th&gt;&lt;th&gt;Score&lt;/th&gt;&lt;/tr&gt;&#10;  &lt;tr&gt;&lt;td&gt;Alice&lt;/td&gt;&lt;td&gt;95&lt;/td&gt;&lt;/tr&gt;&#10;&lt;/table&gt;"></textarea>
+    <div class="preview-wrap" id="pw6" style="margin-top:12px">
+      <div class="preview-header"><span class="preview-label">Tables detected</span><span class="preview-badge" id="pb6">—</span></div>
+      <div id="h6list" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title"><span class="bar"></span>Export Options</div>
+    <div class="options-row" style="margin-top:0">
+      <div class="option-group"><label class="option-label">Tables to Export</label>
+        <select class="option-select" id="o6t"><option value="all">All tables (multi-sheet)</option><option value="first">First table only</option></select></div>
+      <div class="option-group"><label class="option-label">Output Name</label><input class="option-input" id="o6n" value="output.xlsx"></div>
+    </div>
+    <button class="btn-convert" id="btn6" disabled><div class="spinner"></div><span class="btn-text">⬇ Convert &amp; Download Excel</span></button>
+    <div class="status-msg" id="st_6"></div>
+  </div>
+</div>
+
+<!-- Info strip -->
+<div class="info-strip">
+  <div class="info-item"><span class="info-emoji">🔒</span><div class="info-text"><strong>100% Private</strong>Files never leave browser</div></div>
+  <div class="info-item"><span class="info-emoji">🌐</span><div class="info-text"><strong>Unicode Ready</strong>Hindi, Arabic, CJK &amp; more</div></div>
+  <div class="info-item"><span class="info-emoji">⚡</span><div class="info-text"><strong>Instant</strong>No server, no wait</div></div>
+  <div class="info-item"><span class="info-emoji">🔄</span><div class="info-text"><strong>6 Modes</strong>All data formats covered</div></div>
+</div>
+
+</div><!-- /container -->
+
+<script>
+$(function(){
+
+/* ─── Tabs ─────────────────────────────────────────── */
+$('.tab-btn').on('click',function(){
+  $('.tab-btn').removeClass('active');$(this).addClass('active');
+  $('.tab-panel').removeClass('active');$('#'+$(this).data('tab')).addClass('active');
+});
+
+/* ─── Helpers ──────────────────────────────────────── */
+function fmtSize(b){if(b<1024)return b+' B';if(b<1048576)return(b/1024).toFixed(1)+' KB';return(b/1048576).toFixed(2)+' MB';}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function status(el,type,msg){el.attr('class','status-msg '+type+' show').html('<span>'+(type==='success'?'✓':type==='error'?'✗':'ℹ')+'</span> '+msg);}
+function dlBlob(content,fname,mime){const b=new Blob([content],{type:mime}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=fname;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u);}
+function debounce(fn,ms){let t;return function(...a){clearTimeout(t);t=setTimeout(()=>fn.apply(this,a),ms);};}
+function copyText(txt,btn){if(!txt)return;navigator.clipboard.writeText(txt).then(()=>{const o=btn.text();btn.text('Copied!');setTimeout(()=>btn.text(o),1500);});}
+
+function buildTable(data,max){
+  if(!data||!data.length)return'<p style="color:var(--muted);padding:12px;font-size:11px">No data</p>';
+  const rows=data.slice(0,max||6),hdr=rows[0];
+  let h='<table><thead><tr>';
+  hdr.forEach(c=>{h+='<th>'+esc(c)+'</th>';});
+  h+='</tr></thead><tbody>';
+  rows.slice(1).forEach(r=>{h+='<tr>';hdr.forEach((_,i)=>{h+='<td>'+esc(r[i]==null?'':r[i])+'</td>';});h+='</tr>';});
+  return h+'</tbody></table>';
+}
+
+function setupDrop(dz,inp,fn){
+  dz.on('dragover',e=>{e.preventDefault();dz.addClass('dragging');});
+  dz.on('dragleave',()=>dz.removeClass('dragging'));
+  dz.on('drop',e=>{e.preventDefault();dz.removeClass('dragging');const f=e.originalEvent.dataTransfer.files[0];if(f)fn(f);});
+  inp.on('change',function(){if(this.files[0])fn(this.files[0]);});
+}
+
+function setFileInfo(fi,fn,fs,file,ext){fn.text(file.name);fs.text(fmtSize(file.size)+(ext?' · '+ext.toUpperCase():''));fi.addClass('show');}
+
+function parseCSVRow(row,dlm){
+  const res=[];let cur='',inQ=false;
+  for(let i=0;i<row.length;i++){const c=row[i];
+    if(c==='"'){if(inQ&&row[i+1]==='"'){cur+='"';i++;}else inQ=!inQ;}
+    else if(c===dlm&&!inQ){res.push(cur);cur='';}
+    else cur+=c;}
+  res.push(cur);return res;
+}
+
+function csvEsc(v,d){const s=String(v==null?'':v);if(s.includes('"')||s.includes(d)||s.includes('\n'))return'"'+s.replace(/"/g,'""')+'"';return s;}
+function getAllKeys(arr){const k=[];arr.forEach(o=>{if(o&&typeof o==='object')Object.keys(o).forEach(kk=>{if(!k.includes(kk))k.push(kk);});});return k;}
+function csvToObjs(rows){if(!rows||rows.length<2)return[];const h=rows[0];return rows.slice(1).map(r=>{const o={};h.forEach((k,i)=>{o[k]=r[i]!==undefined?r[i]:'';});return o;});}
+function tableToAoa(tbl){const a=[];tbl.querySelectorAll('tr').forEach(tr=>{const r=[];tr.querySelectorAll('th,td').forEach(td=>{const cs=parseInt(td.getAttribute('colspan'))||1;r.push(td.textContent.trim());for(let i=1;i<cs;i++)r.push('');});if(r.some(c=>c!==''))a.push(r);});return a;}
+
+/* ═══════════════════════════════════════════════════
+   TAB 1 · Excel → CSV
+═══════════════════════════════════════════════════ */
+let wb1=null,ws1=null;
+setupDrop($('#dz1'),$('#f1'),function(file){
+  const ext=file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+  if(!['.xlsx','.xls','.xlsm','.ods'].includes(ext)){status($('#st_1'),'error','Invalid file. Use .xlsx .xls .xlsm .ods');return;}
+  setFileInfo($('#fi1'),$('#fn1'),$('#fs1'),file,ext);
+  const rd=new FileReader();
+  rd.onload=e=>{try{
+    wb1=XLSX.read(e.target.result,{type:'array',cellDates:true});
+    ws1=wb1.SheetNames[0];
+    let t='';wb1.SheetNames.forEach((n,i)=>{t+='<button class="sheet-tab'+(i===0?' active':'')+'" data-g="1" data-s="'+esc(n)+'">'+esc(n)+'</button>';});
+    $('#st1').html(t);$('#ss1').addClass('show');
+    rp1();$('#btn1').prop('disabled',false);
+    $('#o1n').val(file.name.replace(/\.[^.]+$/,'')+'.csv');
+    status($('#st_1'),'success',wb1.SheetNames.length+' sheet(s) loaded.');
+  }catch(err){status($('#st_1'),'error',err.message);}};
+  rd.readAsArrayBuffer(file);
+});
+function rp1(){if(!wb1||!ws1)return;const d=XLSX.utils.sheet_to_json(wb1.Sheets[ws1],{header:1,raw:false,defval:''});$('#pb1').text((d.length-1)+' rows × '+(d[0]?d[0].length:0)+' cols');$('#pt1').html(buildTable(d));$('#pw1').addClass('show');}
+$('#cl1').on('click',()=>{wb1=null;ws1=null;$('#fi1,#ss1,#pw1,#st_1').removeClass('show');$('#btn1').prop('disabled',true);$('#f1').val('');});
+$(document).on('click','[data-g]',function(){
+  const g=$(this).data('g'),s=$(this).data('s');
+  $(this).closest('.sheet-tabs').find('.sheet-tab').removeClass('active');$(this).addClass('active');
+  if(g==1){ws1=s;rp1();}
+  if(g==5){ws5=s;re2j();}
+});
+$('#btn1').on('click',function(){
+  const btn=$(this);btn.addClass('loading').prop('disabled',true);
+  setTimeout(()=>{try{
+    const d=$('#o1d').val(),enc=$('#o1e').val();
+    const csv=XLSX.utils.sheet_to_csv(wb1.Sheets[ws1],{FS:d,RS:'\n',defval:''});
+    let fn=$('#o1n').val().trim()||'output.csv';if(!fn.endsWith('.csv'))fn+='.csv';
+    dlBlob((enc==='bom'?'\uFEFF':'')+csv,fn,'text/csv;charset=utf-8;');
+    status($('#st_1'),'success','Downloaded "'+fn+'"');
+  }catch(e){status($('#st_1'),'error',e.message);}
+  btn.removeClass('loading').prop('disabled',false);},80);
+});
+
+/* ═══════════════════════════════════════════════════
+   TAB 2 · CSV → Excel
+═══════════════════════════════════════════════════ */
+let csvFile=null,csvRows=null;
+setupDrop($('#dz2'),$('#f2'),loadCsv2);
+function loadCsv2(file){
+  csvFile=file;setFileInfo($('#fi2'),$('#fn2'),$('#fs2'),file);
+  const rd=new FileReader();
+  rd.onload=e=>{try{
+    let txt=e.target.result;if(txt.charCodeAt(0)===0xFEFF)txt=txt.slice(1);
+    const d=$('#o2d').val();
+    csvRows=txt.split('\n').filter(r=>r.trim()).map(r=>parseCSVRow(r,d));
+    $('#pb2').text((csvRows.length-1)+' rows × '+(csvRows[0]?csvRows[0].length:0)+' cols');
+    $('#pt2').html(buildTable(csvRows));$('#pw2').addClass('show');
+    $('#o2n').val(file.name.replace(/\.[^.]+$/,'')+'.xlsx');
+    $('#btn2').prop('disabled',false);
+    status($('#st_2'),'success',(csvRows.length-1)+' data rows parsed.');
+  }catch(e){status($('#st_2'),'error',e.message);}};
+  rd.readAsText(file,'UTF-8');
+}
+$('#o2d').on('change',()=>{if(csvFile)loadCsv2(csvFile);});
+$('#cl2').on('click',()=>{csvFile=null;csvRows=null;$('#fi2,#pw2,#st_2').removeClass('show');$('#btn2').prop('disabled',true);$('#f2').val('');});
+$('#btn2').on('click',function(){
+  if(!csvRows)return;const btn=$(this);btn.addClass('loading').prop('disabled',true);
+  setTimeout(()=>{try{
+    const wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(csvRows);
+    let sn=($('#o2s').val().trim()||'Sheet1').substring(0,31);
+    XLSX.utils.book_append_sheet(wb,ws,sn);
+    let fn=$('#o2n').val().trim()||'output.xlsx';if(!fn.endsWith('.xlsx'))fn+='.xlsx';
+    XLSX.writeFile(wb,fn,{bookType:'xlsx',compression:true});
+    status($('#st_2'),'success','Downloaded "'+fn+'"');
+  }catch(e){status($('#st_2'),'error',e.message);}
+  btn.removeClass('loading').prop('disabled',false);},80);
+});
+
+/* ═══════════════════════════════════════════════════
+   TAB 3 · JSON → CSV
+═══════════════════════════════════════════════════ */
+setupDrop($('#dz3'),$('#f3'),function(file){
+  setFileInfo($('#fi3'),$('#fn3'),$('#fs3'),file);
+  const rd=new FileReader();
+  rd.onload=e=>{$('#j3in').val(e.target.result);prevJ3();};
+  rd.readAsText(file,'UTF-8');
+});
+$('#cl3').on('click',()=>{$('#fi3').removeClass('show');$('#j3in').val('');$('#pw3').removeClass('show');$('#f3').val('');});
+$('#j3in').on('input',debounce(prevJ3,500));
+function prevJ3(){
+  const raw=$('#j3in').val().trim();if(!raw){$('#pw3').removeClass('show');return;}
+  try{const a=JSON.parse(raw);if(!Array.isArray(a)||!a.length){$('#pw3').removeClass('show');return;}
+    const k=getAllKeys(a),rows=[k,...a.slice(0,5).map(o=>k.map(kk=>o[kk]==null?'':o[kk]))];
+    $('#pb3').text(a.length+' records · '+k.length+' fields');$('#pt3').html(buildTable(rows));$('#pw3').addClass('show');
+  }catch(e){$('#pw3').removeClass('show');}
+}
+$('#btn3').on('click',function(){
+  const btn=$(this);btn.addClass('loading').prop('disabled',true);
+  setTimeout(()=>{try{
+    const raw=$('#j3in').val().trim();if(!raw)throw new Error('No JSON input');
+    const arr=JSON.parse(raw);if(!Array.isArray(arr))throw new Error('JSON must be an array');
+    const d=$('#o3d').val(),k=getAllKeys(arr);
+    const lines=[k.map(kk=>csvEsc(kk,d)).join(d)];
+    arr.forEach(o=>lines.push(k.map(kk=>csvEsc(o[kk]==null?'':o[kk],d)).join(d)));
+    const csv=lines.join('\n');
+    let fn=$('#o3n').val().trim()||'output.csv';if(!fn.endsWith('.csv'))fn+='.csv';
+    dlBlob(($('#o3e').val()==='bom'?'\uFEFF':'')+csv,fn,'text/csv;charset=utf-8;');
+    status($('#st_3'),'success',arr.length+' records → "'+fn+'"');
+  }catch(e){status($('#st_3'),'error',e.message);}
+  btn.removeClass('loading').prop('disabled',false);},80);
+});
+
+/* ═══════════════════════════════════════════════════
+   TAB 4 · CSV → JSON
+═══════════════════════════════════════════════════ */
+let cjFile=null,cjRows=null;
+setupDrop($('#dz4'),$('#f4'),loadCJ);
+function loadCJ(file){
+  cjFile=file;setFileInfo($('#fi4'),$('#fn4'),$('#fs4'),file);
+  const rd=new FileReader();
+  rd.onload=e=>{try{
+    let txt=e.target.result;if(txt.charCodeAt(0)===0xFEFF)txt=txt.slice(1);
+    const d=$('#o4d').val();
+    cjRows=txt.split('\n').filter(r=>r.trim()).map(r=>parseCSVRow(r,d));
+    renderCJ();$('#btn4').prop('disabled',false);
+    $('#o4n').val(file.name.replace(/\.[^.]+$/,'')+'.json');
+    status($('#st_4'),'success',(cjRows.length-1)+' rows ready.');
+  }catch(e){status($('#st_4'),'error',e.message);}};
+  rd.readAsText(file,'UTF-8');
+}
+function renderCJ(){
+  if(!cjRows||cjRows.length<2)return;
+  const arr=csvToObjs(cjRows);
+  $('#j4out').val($('#o4f').val()==='pretty'?JSON.stringify(arr,null,2):JSON.stringify(arr));
+}
+$('#o4d').on('change',()=>{if(cjFile)loadCJ(cjFile);});
+$('#o4f').on('change',renderCJ);
+$('#cl4').on('click',()=>{cjFile=null;cjRows=null;$('#fi4').removeClass('show');$('#j4out').val('');$('#btn4').prop('disabled',true);$('#f4').val('');$('#st_4').removeClass('show');});
+$('#cp4').on('click',()=>copyText($('#j4out').val(),$('#cp4')));
+$('#btn4').on('click',function(){
+  const btn=$(this);btn.addClass('loading').prop('disabled',true);
+  setTimeout(()=>{try{
+    const out=$('#j4out').val();if(!out)throw new Error('No output. Load a CSV first.');
+    let fn=$('#o4n').val().trim()||'output.json';if(!fn.endsWith('.json'))fn+='.json';
+    dlBlob(out,fn,'application/json;charset=utf-8;');
+    status($('#st_4'),'success','Downloaded "'+fn+'"');
+  }catch(e){status($('#st_4'),'error',e.message);}
+  btn.removeClass('loading').prop('disabled',false);},80);
+});
+
+/* ═══════════════════════════════════════════════════
+   TAB 5 · Excel → JSON
+═══════════════════════════════════════════════════ */
+let wb5=null,ws5=null;
+setupDrop($('#dz5'),$('#f5'),function(file){
+  const ext=file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+  if(!['.xlsx','.xls','.xlsm','.ods'].includes(ext)){status($('#st_5'),'error','Invalid file type.');return;}
+  setFileInfo($('#fi5'),$('#fn5'),$('#fs5'),file,ext);
+  const rd=new FileReader();
+  rd.onload=e=>{try{
+    wb5=XLSX.read(e.target.result,{type:'array',cellDates:true});
+    ws5=wb5.SheetNames[0];
+    let t='';wb5.SheetNames.forEach((n,i)=>{t+='<button class="sheet-tab'+(i===0?' active':'')+'" data-g="5" data-s="'+esc(n)+'">'+esc(n)+'</button>';});
+    $('#st5').html(t);$('#ss5').addClass('show');
+    re2j();$('#btn5').prop('disabled',false);
+    $('#o5n').val(file.name.replace(/\.[^.]+$/,'')+'.json');
+    status($('#st_5'),'success',wb5.SheetNames.length+' sheet(s) loaded.');
+  }catch(e){status($('#st_5'),'error',e.message);}};
+  rd.readAsArrayBuffer(file);
+});
+function re2j(){
+  if(!wb5||!ws5)return;
+  const fmt=$('#o5f').val();let json;
+  if(fmt==='arrays'){const d=XLSX.utils.sheet_to_json(wb5.Sheets[ws5],{header:1,raw:false,defval:''});json=JSON.stringify(d,null,2);}
+  else{const a=XLSX.utils.sheet_to_json(wb5.Sheets[ws5],{raw:false,defval:''});json=fmt==='pretty'?JSON.stringify(a,null,2):JSON.stringify(a);}
+  $('#j5out').val(json);
+}
+$('#o5f').on('change',re2j);
+$('#cl5').on('click',()=>{wb5=null;ws5=null;$('#fi5,#ss5,#st_5').removeClass('show');$('#j5out').val('');$('#btn5').prop('disabled',true);$('#f5').val('');});
+$('#cp5').on('click',()=>copyText($('#j5out').val(),$('#cp5')));
+$('#btn5').on('click',function(){
+  const btn=$(this);btn.addClass('loading').prop('disabled',true);
+  setTimeout(()=>{try{
+    const out=$('#j5out').val();if(!out)throw new Error('No output. Load an Excel file first.');
+    let fn=$('#o5n').val().trim()||'output.json';if(!fn.endsWith('.json'))fn+='.json';
+    dlBlob(out,fn,'application/json;charset=utf-8;');
+    status($('#st_5'),'success','Downloaded "'+fn+'"');
+  }catch(e){status($('#st_5'),'error',e.message);}
+  btn.removeClass('loading').prop('disabled',false);},80);
+});
+
+/* ═══════════════════════════════════════════════════
+   TAB 6 · HTML Table → Excel
+═══════════════════════════════════════════════════ */
+let htmlTables=[];
+$('#h6in').on('input',debounce(parseHTML6,400));
+function parseHTML6(){
+  const html=$('#h6in').val().trim();
+  if(!html){htmlTables=[];$('#pw6').removeClass('show');$('#btn6').prop('disabled',true);return;}
+  try{
+    const doc=new DOMParser().parseFromString(html,'text/html');
+    const tbls=doc.querySelectorAll('table');
+    if(!tbls.length){status($('#st_6'),'error','No &lt;table&gt; found in HTML.');$('#pw6').removeClass('show');$('#btn6').prop('disabled',true);return;}
+    htmlTables=Array.from(tbls).map(t=>tableToAoa(t));
+    $('#pb6').text(tbls.length+' table(s)');
+    let li='';htmlTables.forEach((t,i)=>{li+='<span class="sheet-tab active">Table '+(i+1)+' ('+(t.length-1)+' rows)</span>';});
+    $('#h6list').html(li);$('#pw6').addClass('show');$('#btn6').prop('disabled',false);$('#st_6').removeClass('show');
+  }catch(e){status($('#st_6'),'error',e.message);}
+}
+$('#h6fetch').on('click',function(){
+  const url=$('#h6url').val().trim();
+  if(!url){status($('#st_6'),'error','Enter a URL first.');return;}
+  status($('#st_6'),'info','Fetching…');
+  $.ajax({url:'https://api.allorigins.win/get?url='+encodeURIComponent(url),
+    success:d=>{$('#h6in').val(d.contents);parseHTML6();},
+    error:()=>status($('#st_6'),'error','Fetch failed. Paste the HTML manually instead.')
+  });
+});
+$('#btn6').on('click',function(){
+  if(!htmlTables.length)return;const btn=$(this);btn.addClass('loading').prop('disabled',true);
+  setTimeout(()=>{try{
+    const mode=$('#o6t').val();
+    const wb=XLSX.utils.book_new();
+    const list=mode==='first'?[htmlTables[0]]:htmlTables;
+    list.forEach((aoa,i)=>{const ws=XLSX.utils.aoa_to_sheet(aoa);XLSX.utils.book_append_sheet(wb,ws,('Table_'+(i+1)).substring(0,31));});
+    let fn=$('#o6n').val().trim()||'output.xlsx';if(!fn.endsWith('.xlsx'))fn+='.xlsx';
+    XLSX.writeFile(wb,fn,{bookType:'xlsx',compression:true});
+    status($('#st_6'),'success',list.length+' table(s) → "'+fn+'"');
+  }catch(e){status($('#st_6'),'error',e.message);}
+  btn.removeClass('loading').prop('disabled',false);},80);
+});
+
+});
+</script>
+</body>
+</html>
